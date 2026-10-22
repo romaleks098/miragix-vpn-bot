@@ -2,43 +2,27 @@ import os
 import sys
 import json
 import urllib.request
-import urllib.error
+import time
 
 RENDER_API_KEY = os.getenv("RENDER_API_KEY", "").strip()
 SERVICE_ID = "srv-dbd7ukl9fdbs73aondsg"
 
 headers = {
     "Authorization": f"Bearer {RENDER_API_KEY}",
-    "Accept": "application/json",
-    "Content-Type": "application/json"
+    "Accept": "application/json"
 }
 
-def make_request(url, method="GET", data=None):
-    body = json.dumps(data).encode("utf-8") if data else None
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req) as resp:
-            content = resp.read().decode("utf-8")
-            return json.loads(content) if content else {}
-    except urllib.error.HTTPError as e:
-        error_content = e.read().decode("utf-8")
-        print(f"HTTP Error {e.code} on {method} {url}: {error_content}")
-        return {"error": e.code, "message": error_content}
-    except Exception as e:
-        print(f"Request error: {e}")
-        return {"error": str(e)}
+def make_request(url):
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req) as resp:
+        return json.loads(resp.read().decode())
 
-print("1. Patching serviceDetails on Render...")
-patch_data = {
-    "serviceDetails": {
-        "env": "python",
-        "buildCommand": "pip install -r requirements.txt",
-        "startCommand": "python bot.py"
-    }
-}
-patch_resp = make_request(f"https://api.render.com/v1/services/{SERVICE_ID}", method="PATCH", data=patch_data)
-print("Patch response:", json.dumps(patch_resp, indent=2))
-
-print("2. Triggering fresh deploy...")
-deploy_resp = make_request(f"https://api.render.com/v1/services/{SERVICE_ID}/deploys", method="POST", data={})
-print("Deploy response:", json.dumps(deploy_resp, indent=2))
+for i in range(5):
+    deploys = make_request(f"https://api.render.com/v1/services/{SERVICE_ID}/deploys?limit=1")
+    if deploys and len(deploys) > 0:
+        d = deploys[0].get("deploy", {})
+        status = d.get("status")
+        print(f"[{i+1}/5] Deploy {d.get('id')} status: {status}")
+        if status in ["live", "build_failed", "update_failed", "canceled"]:
+            break
+    time.sleep(10)
