@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from aiohttp import web
+from aiohttp import web, ClientSession
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
@@ -16,7 +16,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
 
-# Веб-сервер для Render (Health Check, чтобы Render не ругался на отсутствие порта)
+# Веб-сервер для Render (Health Check)
 async def handle_ping(request):
     return web.json_response({
         "status": "online",
@@ -37,13 +37,29 @@ async def start_web_server():
     await site.start()
     logging.info(f"Веб-сервер запущен на порту {port} (для Render)")
 
+# Автоматический фоновый самопингер (защита от спячки Render без сторонних сервисов)
+async def keep_alive_task():
+    app_url = os.getenv("RENDER_EXTERNAL_URL") or "https://miragix-vpn-bot.onrender.com"
+    health_url = f"{app_url.rstrip('/')}/health"
+    await asyncio.sleep(30)  # Подождать 30 секунд после старта
+    logging.info(f"Запущена встроенная защита от спячки. Пинг на: {health_url}")
+    
+    while True:
+        try:
+            async with ClientSession() as session:
+                async with session.get(health_url, timeout=10) as resp:
+                    logging.info(f"Защита от спячки: успешный пинг ({resp.status})")
+        except Exception as e:
+            logging.warning(f"Ошибка самопинга: {e}")
+        await asyncio.sleep(600)  # Каждые 10 минут
+
 async def run_bot_polling(bot: Bot, dp: Dispatcher):
     while True:
         try:
             try:
                 await bot.delete_webhook(drop_pending_updates=True)
             except Exception as e:
-                logging.warning(f"Не удалось удалить вебхук (сетевая задержка): {e}")
+                logging.warning(f"Не удалось удалить вебхук: {e}")
 
             logging.info("Miragix VPN Бот подключился к Telegram и ожидает сообщений...")
             await dp.start_polling(bot, handle_signals=False)
@@ -57,7 +73,6 @@ async def run_bot_polling(bot: Bot, dp: Dispatcher):
 async def main():
     if not config.BOT_TOKEN:
         logging.error("Критическая ошибка: BOT_TOKEN не указан в файле .env!")
-        print("\n[!] ОШИБКА: Пожалуйста, откройте файл .env и вставьте ваш BOT_TOKEN от @BotFather!\n")
         return
 
     # Инициализация базы данных
@@ -65,6 +80,9 @@ async def main():
 
     # Запуск легковесного веб-сервера для Render
     await start_web_server()
+
+    # Запуск авто-пингера против спячки в фоне
+    asyncio.create_task(keep_alive_task())
 
     # Создание бота и диспетчера
     bot = Bot(
