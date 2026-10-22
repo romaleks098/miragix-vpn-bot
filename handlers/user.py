@@ -1,8 +1,9 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from datetime import datetime
-import os
 
 import database
 import keyboards
@@ -10,6 +11,9 @@ from marzban_api import marzban_service
 import config
 
 router = Router()
+
+class PromoState(StatesGroup):
+    waiting_for_code = State()
 
 BANNER_MAIN = "https://raw.githubusercontent.com/romaleks098/miragix-vpn-bot/master/assets/banner_main.jpg"
 BANNER_INSTRUCTIONS = "https://raw.githubusercontent.com/romaleks098/miragix-vpn-bot/master/assets/banner_instructions.jpg"
@@ -24,7 +28,6 @@ async def update_view(call: CallbackQuery, text: str, reply_markup=None, photo_u
         else:
             await call.message.edit_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
     except Exception:
-        # Если не удалось отредактировать (например, переход между разными типами сообщений)
         try:
             await call.message.delete()
         except Exception:
@@ -35,11 +38,23 @@ async def update_view(call: CallbackQuery, text: str, reply_markup=None, photo_u
             await call.message.answer(text, reply_markup=reply_markup, parse_mode="HTML")
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
+    
+    # Обработка реферального кода вида /start ref_123456789
+    referrer_id = 0
+    parts = message.text.split()
+    if len(parts) > 1 and parts[1].startswith("ref_"):
+        try:
+            referrer_id = int(parts[1].replace("ref_", ""))
+        except ValueError:
+            pass
+
     user = await database.register_user(
         telegram_id=message.from_user.id,
         username=message.from_user.username,
-        full_name=message.from_user.full_name
+        full_name=message.from_user.full_name,
+        referrer_id=referrer_id
     )
     
     has_sub = bool(user["is_active"] and user["expire_date"] and datetime.fromisoformat(user["expire_date"]) > datetime.now())
@@ -48,12 +63,12 @@ async def cmd_start(message: Message):
     text = (
         f"👋 Привет, <b>{message.from_user.first_name}</b>!\n\n"
         "Добро пожаловать в <b>Miragix VPN</b> — скоростной и безопасный интернет без ограничений.\n\n"
-        "🌟 <b>Наши преимущества:</b>\n"
-        "• Полный доступ к <b>Google AI (Gemini, AI Studio)</b> и YouTube в 4K\n"
-        "• Невидимость для систем блокировок (протоколы VLESS-Reality)\n"
-        "• Универсальная подписка: работает в <b>Happ, Streisand, v2rayNG, Hiddify, NekoBox</b>\n"
-        "• Умная маршрутизация: банки и сервисы РФ работают напрямую\n\n"
-        "Выберите действие в меню ниже:"
+        "🌟 <b>Ключевые возможности:</b>\n"
+        "• 🤖 Полный доступ к <b>Google AI (Gemini, AI Studio)</b> и YouTube 4K\n"
+        "• 🛡 Устойчивость к блокировкам и ТСПУ (протокол VLESS-Reality)\n"
+        "• 📱 Работает во всех приложениях (Happ, Streisand, v2rayNG, Hiddify, NekoBox)\n"
+        "• 🇷🇺 Умная маршрутизация: банки и Госуслуги работают напрямую без задержек\n\n"
+        "Выберите раздел в меню ниже:"
     )
     
     try:
@@ -71,14 +86,15 @@ async def cmd_start(message: Message):
         )
 
 @router.callback_query(F.data == "back_main")
-async def cb_back_main(call: CallbackQuery):
+async def cb_back_main(call: CallbackQuery, state: FSMContext):
+    await state.clear()
     user = await database.get_user(call.from_user.id)
     has_sub = bool(user and user["is_active"] and user["expire_date"] and datetime.fromisoformat(user["expire_date"]) > datetime.now())
     trial_available = not bool(user and user["trial_used"])
     
     text = (
         "⚡️ <b>Главное меню Miragix VPN:</b>\n\n"
-        "Выберите нужный раздел ниже:"
+        "Выберите интересующий вас раздел:"
     )
     await update_view(
         call,
@@ -95,7 +111,7 @@ async def cb_claim_trial(call: CallbackQuery):
         await call.answer("Вы уже использовали бесплатный тестовый период!", show_alert=True)
         return
 
-    await call.answer("Генерируем ваш ключ доступа...")
+    await call.answer("Генерируем персональный ключ...")
     
     result = await marzban_service.create_or_extend_user(call.from_user.id, days=config.TRIAL_DAYS)
     if not result:
@@ -117,12 +133,12 @@ async def cb_claim_trial(call: CallbackQuery):
     formatted_date = expire_dt.strftime("%d.%m.%Y %H:%M")
     
     msg_text = (
-        f"🎉 <b>Тестовый период на {config.TRIAL_DAYS} дня успешно активирован!</b>\n\n"
+        f"🎉 <b>Тестовый период на {config.TRIAL_DAYS} дня активирован!</b>\n\n"
         f"📅 Активен до: <b>{formatted_date}</b>\n\n"
         f"🔑 <b>Ваша универсальная ссылка-подписка:</b>\n"
         f"<code>{sub_url}</code>\n\n"
-        "<i>(Нажмите на ссылку выше, чтобы скопировать её в буфер обмена)</i>\n\n"
-        "👉 Скопируйте ссылку и добавьте её в любое приложение (Happ, Streisand, v2rayNG, Hiddify)."
+        "<i>(Нажмите на ссылку выше, чтобы скопировать её)</i>\n\n"
+        "👉 Вставьте её в любое приложение (Happ, Streisand, v2rayNG, Hiddify)."
     )
     
     await update_view(
@@ -147,7 +163,7 @@ async def cb_my_sub(call: CallbackQuery):
     formatted_date = exp_date.strftime("%d.%m.%Y %H:%M")
     
     text = (
-        f"🔑 <b>Информация о вашей подписке:</b>\n\n"
+        f"🔑 <b>Информация о подписке:</b>\n\n"
         f"• Статус: <b>{status_str}</b>\n"
         f"• Срок действия: до <b>{formatted_date}</b>\n\n"
         f"🔗 <b>Ваша ссылка для подключения:</b>\n"
@@ -163,10 +179,10 @@ async def cb_tariffs(call: CallbackQuery):
     text = (
         "💳 <b>Тарифные планы Miragix VPN:</b>\n\n"
         "Все тарифы включают:\n"
-        "• Неограниченную скорость и трафик\n"
+        "• Неограниченную скорость и трафик (до 1 Гбит/с)\n"
         "• Доступ к Google AI, YouTube 4K, ChatGPT, Instagram\n"
-        "• Защиту от систем блокировок\n"
-        "• До 5 устройств на одном ключе\n\n"
+        "• Защиту от DPI и белых списков\n"
+        "• До 5 подключенных устройств на одну подписку\n\n"
         "Выберите желаемый период:"
     )
     await update_view(call, text=text, reply_markup=keyboards.tariffs_kb(), photo_url=BANNER_MAIN)
@@ -184,15 +200,175 @@ async def cb_buy_tariff(call: CallbackQuery):
         f"🧾 <b>Оформление подписки: {tariff['title']}</b>\n"
         f"Сумма к оплате: <b>{tariff['price']} ₽</b>\n\n"
         "Способы оплаты:\n"
-        "• СБП / Банковская карта РФ (МИР, Visa, Mastercard)\n"
-        "• Telegram Stars (Звезды)\n"
-        "• Криптовалюта (USDT TRC20 / TON)\n\n"
-        "<i>(Платежный шлюз подключается при переходе на боевой сервер)</i>"
+        "• 💳 Банковская карта РФ / СБП (МИР, Visa, Mastercard)\n"
+        "• ⭐️ Telegram Stars\n"
+        "• 💎 Криптовалюта (USDT TRC20 / TON / CryptoBot)\n\n"
+        "<i>(Платежный шлюз подключается при запуске сервиса)</i>"
     )
     await update_view(call, text=text, reply_markup=keyboards.back_to_menu_kb(), photo_url=BANNER_MAIN)
     await call.answer()
 
-# --- МЕНЮ ИНСТРУКЦИЙ С БАННЕРАМИ ---
+# --- ЦЕНТР ЗАГРУЗОК ПО ---
+
+@router.callback_query(F.data == "downloads_center")
+async def cb_downloads_center(call: CallbackQuery):
+    text = (
+        "📥 <b>Центр загрузок приложений:</b>\n\n"
+        "Скачайте официальный проверенный клиент для вашего устройства:\n\n"
+        "🍏 <b>Для iPhone / iPad:</b>\n"
+        "• <b>Happ Proxy Utility</b> — самый быстрый и современный (App Store)\n"
+        "• <b>Streisand</b> — легкий и надежный (App Store)\n\n"
+        "🤖 <b>Для Android:</b>\n"
+        "• <b>v2rayNG</b> — классика с открытым кодом (Google Play)\n"
+        "• <b>Hiddify Next</b> — современный интерфейс в 1 клик\n\n"
+        "💻 <b>Для Windows / Компьютера:</b>\n"
+        "• <b>NekoBox</b> — профессиональный клиент с системным прокси\n"
+        "• <b>Hiddify Next</b> — простой клиент под Windows\n\n"
+        "Нажмите на кнопку нужного приложения ниже для перехода к загрузке:"
+    )
+    await update_view(call, text=text, reply_markup=keyboards.downloads_center_kb(), photo_url=BANNER_INSTRUCTIONS)
+    await call.answer()
+
+# --- СТАТУС СЕРВЕРОВ ---
+
+@router.callback_query(F.data == "server_status")
+async def cb_server_status(call: CallbackQuery):
+    now_str = datetime.now().strftime("%H:%M:%S")
+    text = (
+        "🌐 <b>Мониторинг сети Miragix VPN:</b>\n\n"
+        "🇸🇪 <b>Швеция (Стокгольм):</b>\n"
+        "• Статус: 🟢 Онлайн\n"
+        "• Пинг: ~28 ms | Канал: 1 Gbps\n"
+        "• Сервисы: <b>Google AI Studio ✅</b>, YouTube 4K ✅\n\n"
+        "🇩🇪 <b>Германия (Франкфурт):</b>\n"
+        "• Статус: 🟢 Онлайн\n"
+        "• Пинг: ~38 ms | Канал: 1 Gbps\n"
+        "• Сервисы: <b>Gemini ✅</b>, ChatGPT, Instagram ✅\n\n"
+        "🇳🇱 <b>Нидерланды (Амстердам):</b>\n"
+        "• Статус: 🟢 Онлайн\n"
+        "• Пинг: ~42 ms | Канал: 1 Gbps\n"
+        "• Сервисы: Стриминг, Торренты, Облака ✅\n\n"
+        "🇷🇺 <b>Москва (Шлюз-Мост):</b>\n"
+        "• Статус: 🟢 Онлайн\n"
+        "• Пинг: ~12 ms\n"
+        "• Назначение: <b>Обход «белых списков» и шатдаунов</b> ✅\n\n"
+        f"<i>Обновлено в {now_str} (Все узлы работают штатно)</i>"
+    )
+    await update_view(call, text=text, reply_markup=keyboards.server_status_kb(), photo_url=BANNER_MAIN)
+    await call.answer()
+
+# --- РЕФЕРАЛЬНАЯ ПРОГРАММА ---
+
+@router.callback_query(F.data == "referral_program")
+async def cb_referral_program(call: CallbackQuery):
+    bot_info = await call.bot.get_me()
+    ref_link = f"https://t.me/{bot_info.username}?start=ref_{call.from_user.id}"
+    refs_count = await database.get_referrals_count(call.from_user.id)
+    
+    text = (
+        "👥 <b>Партнерская программа «Пригласи друга»:</b>\n\n"
+        "Поделитесь своей персональной ссылкой с друзьями, коллегами или в соцсетях.\n\n"
+        "🎁 <b>Условия:</b>\n"
+        "• За каждого нового пользователя, перешедшего по вашей ссылке, вы получаете <b>+3 дня подписки БЕСПЛАТНО</b>.\n"
+        "• Друг получает стандартный бесплатный тест на 3 дня.\n\n"
+        f"📊 Вы уже пригласили: <b>{refs_count} чел.</b>\n\n"
+        "🔗 <b>Ваша пригласительная ссылка:</b>\n"
+        f"<code>{ref_link}</code>\n\n"
+        "<i>(Нажмите на ссылку, чтобы скопировать её)</i>"
+    )
+    await update_view(call, text=text, reply_markup=keyboards.back_to_menu_kb(), photo_url=BANNER_MAIN)
+    await call.answer()
+
+# --- БАЗА ЗНАНИЙ (FAQ) ---
+
+@router.callback_query(F.data == "faq_menu")
+async def cb_faq_menu(call: CallbackQuery):
+    text = (
+        "❓ <b>Часто задаваемые вопросы (FAQ):</b>\n\n"
+        "Выберите вопрос, чтобы прочитать подробный ответ:"
+    )
+    await update_view(call, text=text, reply_markup=keyboards.faq_kb(), photo_url=BANNER_INSTRUCTIONS)
+    await call.answer()
+
+@router.callback_query(F.data == "faq_banks")
+async def cb_faq_banks(call: CallbackQuery):
+    text = (
+        "🏦 <b>Работают ли банки и Госуслуги при включенном VPN?</b>\n\n"
+        "<b>ДА, работают отлично!</b>\n\n"
+        "В наших клиентах (Happ, v2rayNG, Hiddify) используется **умная маршрутизация**:\n"
+        "• Все российские сайты (`.ru`, Госуслуги, Сбербанк, Тинькофф, Ozon, Wildberries) открываются <b>напрямую</b> на максимальной скорости вашего провайдера.\n"
+        "• Через защищенный зарубежный сервер идут <b>только</b> заблокированные сайты и Google AI.\n\n"
+        "Вам не нужно постоянно включать и выключать VPN!"
+    )
+    await update_view(call, text=text, reply_markup=keyboards.faq_kb(), photo_url=BANNER_INSTRUCTIONS)
+    await call.answer()
+
+@router.callback_query(F.data == "faq_ai")
+async def cb_faq_ai(call: CallbackQuery):
+    text = (
+        "🤖 <b>Доступ к Google AI (Gemini, AI Studio) и ChatGPT:</b>\n\n"
+        "Все наши европейские серверы (Швеция, Германия, Нидерланды) имеют чистые IP-адреса и поддерживают полный доступ к:\n"
+        "• <b>Google AI Studio</b> (`aistudio.google.com`)\n"
+        "• <b>Google Gemini</b> (`gemini.google.com`)\n"
+        "• <b>ChatGPT / OpenAI</b>\n"
+        "• <b>Claude by Anthropic</b>\n\n"
+        "Ошибки «Not available in your country» не возникают."
+    )
+    await update_view(call, text=text, reply_markup=keyboards.faq_kb(), photo_url=BANNER_INSTRUCTIONS)
+    await call.answer()
+
+@router.callback_query(F.data == "faq_shutdown")
+async def cb_faq_shutdown(call: CallbackQuery):
+    text = (
+        "🛡 <b>Что делать во время шатдауна или режима «белых списков»?</b>\n\n"
+        "Когда операторы связи глушат внешний интернет и оставляют доступ только к списку разрешенных сайтов:\n\n"
+        "1. Наш протокол <b>VLESS-Reality</b> маскирует трафик под обычное посещение разрешенных ресурсов.\n"
+        "2. В подписку встроен резервный узел через дата-центр в Москве (Relay-мост), который сохраняет связь даже во время региональных ограничений мобильных вышек."
+    )
+    await update_view(call, text=text, reply_markup=keyboards.faq_kb(), photo_url=BANNER_INSTRUCTIONS)
+    await call.answer()
+
+@router.callback_query(F.data == "faq_devices")
+async def cb_faq_devices(call: CallbackQuery):
+    text = (
+        "📱 <b>Сколько устройств можно подключить на одну подписку?</b>\n\n"
+        "На одном ключе разрешено подключать <b>до 5 устройств одновременно</b> (например: ваш телефон, рабочий ноутбук, домашний ПК, планшет и телефон близкого человека).\n\n"
+        "Просто вставьте одну и ту же ссылку-подписку во все ваши устройства."
+    )
+    await update_view(call, text=text, reply_markup=keyboards.faq_kb(), photo_url=BANNER_INSTRUCTIONS)
+    await call.answer()
+
+# --- ВВОД ПРОМОКОДА ---
+
+@router.callback_query(F.data == "enter_promo")
+async def cb_enter_promo(call: CallbackQuery, state: FSMContext):
+    await state.set_state(PromoState.waiting_for_code)
+    text = (
+        "🎟 <b>Активация промокода:</b>\n\n"
+        "Отправьте секретный промокод в ответном сообщении.\n\n"
+        "💡 <i>Подсказка: попробуйте ввести приветственный промокод:</i>\n"
+        "<code>MIRAGIX2026</code>"
+    )
+    await update_view(call, text=text, reply_markup=keyboards.back_to_menu_kb(), photo_url=BANNER_MAIN)
+    await call.answer()
+
+@router.message(PromoState.waiting_for_code)
+async def process_promocode(message: Message, state: FSMContext):
+    code = message.text.strip()
+    success, msg = await database.activate_promocode(message.from_user.id, code)
+    await state.clear()
+    
+    user = await database.get_user(message.from_user.id)
+    has_sub = bool(user and user["is_active"] and user["expire_date"] and datetime.fromisoformat(user["expire_date"]) > datetime.now())
+    trial_available = not bool(user and user["trial_used"])
+    
+    await message.answer(
+        f"{msg}\n\nВозвращаемся в главное меню:",
+        reply_markup=keyboards.main_menu_kb(has_active_sub=has_sub, trial_available=trial_available),
+        parse_mode="HTML"
+    )
+
+# --- МЕНЮ ИНСТРУКЦИЙ ПО ПЛАТФОРМАМ ---
 
 @router.callback_query(F.data == "instructions")
 async def cb_instructions(call: CallbackQuery):
