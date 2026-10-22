@@ -2,6 +2,10 @@ name: Update Bot Info
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/set_commands.py'
+      - 'scripts/update_bot_info.py'
 
 jobs:
   update_info:
@@ -15,8 +19,9 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Run update_bot_info
+      - name: Run update_bot_info and set_commands
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
           python scripts/update_bot_info.py
+          python scripts/set_commands.py

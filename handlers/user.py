@@ -86,6 +86,89 @@ async def cmd_start(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
 
+@router.message(Command("sub"))
+async def cmd_sub(message: Message):
+    user = await database.get_user(message.from_user.id)
+    if not user or not user["sub_url"]:
+        await message.answer("У вас еще нет активной подписки. Нажмите /start чтобы получить бесплатный тест!")
+        return
+    now = datetime.now()
+    exp_date = datetime.fromisoformat(user["expire_date"])
+    is_active = exp_date > now
+    status_str = "🟢 Активна" if is_active else "🔴 Истекла"
+    formatted_date = exp_date.strftime("%d.%m.%Y %H:%M")
+    text = (
+        f"🔑 <b>Информация о подписке:</b>\n\n"
+        f"• Статус: <b>{status_str}</b>\n"
+        f"• Срок действия: до <b>{formatted_date}</b>\n\n"
+        f"🔗 <b>Ваша ссылка для подключения:</b>\n"
+        f"<code>{user['sub_url']}</code>\n\n"
+        "<i>Поддерживает автообновление серверов во всех клиентах.</i>"
+    )
+    await message.answer_photo(photo=BANNER_MAIN, caption=text, reply_markup=keyboards.back_to_menu_kb(), parse_mode="HTML")
+
+@router.message(Command("tariffs"))
+async def cmd_tariffs(message: Message):
+    text = (
+        "🔥 <b>Специальное предложение со скидками до -41%!</b>\n\n"
+        "⚡️ <b>1 Месяц</b> — <b>99 ₽</b> <s>150 ₽</s> <i>(-34%)</i>\n"
+        "⚡️ <b>3 Месяца</b> — <b>249 ₽</b> <s>400 ₽</s> <i>(83 ₽/мес, -38%)</i>\n"
+        "⚡️ <b>6 Месяцев</b> — <b>449 ₽</b> <s>750 ₽</s> <i>(75 ₽/мес, -40%)</i>\n"
+        "👑 <b>1 Год</b> — <b>799 ₽</b> <s>1350 ₽</s> <i>(всего 66 ₽/мес, -41%)</i>\n\n"
+        "🌟 <b>В каждый тариф включено:</b>\n"
+        "• Скорость до 1 Гбит/с без лимита\n"
+        "• Google AI Studio, Gemini, ChatGPT, YouTube 4K\n"
+        "• Умная маршрутизация\n"
+        "• До 5 подключенных устройств\n\n"
+        "Выберите желаемый период ниже:"
+    )
+    await message.answer_photo(photo=BANNER_TARIFFS, caption=text, reply_markup=keyboards.tariffs_kb(), parse_mode="HTML")
+
+@router.message(Command("apps"))
+async def cmd_apps(message: Message):
+    text = (
+        "📥 <b>Центр загрузок приложений:</b>\n\n"
+        "Выберите официальный проверенный клиент для вашего устройства:"
+    )
+    await message.answer_photo(photo=BANNER_INSTRUCTIONS, caption=text, reply_markup=keyboards.downloads_center_kb(), parse_mode="HTML")
+
+@router.message(Command("status"))
+async def cmd_status(message: Message):
+    now_str = datetime.now().strftime("%H:%M:%S")
+    text = (
+        "🌐 <b>Мониторинг сети Miragix VPN:</b>\n\n"
+        "🇸🇪 <b>Швеция (Стокгольм):</b>\n"
+        "• Статус: 🟢 Онлайн | ~28 ms | Google AI Studio ✅\n\n"
+        "🇩🇪 <b>Германия (Франкфурт):</b>\n"
+        "• Статус: 🟢 Онлайн | ~38 ms | Gemini ✅ | YouTube 4K ✅\n\n"
+        "🇳🇱 <b>Нидерланды (Амстердам):</b>\n"
+        "• Статус: 🟢 Онлайн | ~42 ms | Стриминг, Соцсети ✅\n\n"
+        "🇷🇺 <b>Москва (Шлюз-Мост):</b>\n"
+        "• Статус: 🟢 Онлайн | ~12 ms | Обход белых списков ✅\n\n"
+        f"<i>Обновлено в {now_str} (Все узлы работают штатно)</i>"
+    )
+    await message.answer_photo(photo=BANNER_MAIN, caption=text, reply_markup=keyboards.server_status_kb(), parse_mode="HTML")
+
+@router.message(Command("promo"))
+async def cmd_promo(message: Message, state: FSMContext):
+    await state.set_state(PromoState.waiting_for_code)
+    text = (
+        "🎟 <b>Активация промокода:</b>\n\n"
+        "Отправьте секретный промокод в ответном сообщении.\n\n"
+        "💡 <i>Подсказка: попробуйте приветственный промокод:</i>\n"
+        "<code>MIRAGIX2026</code>"
+    )
+    await message.answer(text, reply_markup=keyboards.back_to_menu_kb(), parse_mode="HTML")
+
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    text = (
+        f"💬 <b>Служба заботы и поддержки Miragix VPN:</b>\n\n"
+        f"Если у вас возникли вопросы по настройке или работе подписки — напишите нашему менеджеру: @{config.SUPPORT_USERNAME}\n\n"
+        "Мы всегда на связи и рады помочь!"
+    )
+    await message.answer(text, reply_markup=keyboards.back_to_menu_kb(), parse_mode="HTML")
+
 @router.callback_query(F.data == "back_main")
 async def cb_back_main(call: CallbackQuery, state: FSMContext):
     await state.clear()
