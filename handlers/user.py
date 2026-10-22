@@ -17,6 +17,7 @@ class PromoState(StatesGroup):
 
 BANNER_MAIN = "https://raw.githubusercontent.com/romaleks098/miragix-vpn-bot/master/assets/banner_main.jpg"
 BANNER_INSTRUCTIONS = "https://raw.githubusercontent.com/romaleks098/miragix-vpn-bot/master/assets/banner_instructions.jpg"
+BANNER_TARIFFS = "https://raw.githubusercontent.com/romaleks098/miragix-vpn-bot/master/assets/banner_tariffs.jpg"
 
 async def update_view(call: CallbackQuery, text: str, reply_markup=None, photo_url: str = None):
     try:
@@ -177,15 +178,19 @@ async def cb_my_sub(call: CallbackQuery):
 @router.callback_query(F.data == "tariffs")
 async def cb_tariffs(call: CallbackQuery):
     text = (
-        "💳 <b>Тарифные планы Miragix VPN:</b>\n\n"
-        "Все тарифы включают:\n"
-        "• Неограниченную скорость и трафик (до 1 Гбит/с)\n"
-        "• Доступ к Google AI, YouTube 4K, ChatGPT, Instagram\n"
-        "• Защиту от DPI и белых списков\n"
+        "🔥 <b>Специальное предложение со скидками до -41%!</b>\n\n"
+        "⚡️ <b>1 Месяц</b> — <b>99 ₽</b> <s>150 ₽</s> <i>(-34%)</i>\n"
+        "⚡️ <b>3 Месяца</b> — <b>249 ₽</b> <s>400 ₽</s> <i>(83 ₽/мес, -38%)</i>\n"
+        "⚡️ <b>6 Месяцев</b> — <b>449 ₽</b> <s>750 ₽</s> <i>(75 ₽/мес, -40%)</i>\n"
+        "👑 <b>1 Год</b> — <b>799 ₽</b> <s>1350 ₽</s> <i>(всего 66 ₽/мес, -41%)</i>\n\n"
+        "🌟 <b>В каждый тариф включено:</b>\n"
+        "• Неограниченная скорость до 1 Гбит/с без лимита трафика\n"
+        "• Полный доступ к Google AI Studio, Gemini, ChatGPT, YouTube 4K\n"
+        "• Умная маршрутизация: банки и сервисы РФ работают напрямую\n"
         "• До 5 подключенных устройств на одну подписку\n\n"
-        "Выберите желаемый период:"
+        "Выберите желаемый тариф ниже:"
     )
-    await update_view(call, text=text, reply_markup=keyboards.tariffs_kb(), photo_url=BANNER_MAIN)
+    await update_view(call, text=text, reply_markup=keyboards.tariffs_kb(), photo_url=BANNER_TARIFFS)
     await call.answer()
 
 @router.callback_query(F.data.startswith("buy_"))
@@ -196,16 +201,20 @@ async def cb_buy_tariff(call: CallbackQuery):
         await call.answer("Тариф не найден.", show_alert=True)
         return
         
+    old_p = tariff.get("old_price", "")
+    disc = tariff.get("discount", "")
+    old_p_str = f" <s>{old_p} ₽</s> ({disc})" if old_p else ""
+    
     text = (
         f"🧾 <b>Оформление подписки: {tariff['title']}</b>\n"
-        f"Сумма к оплате: <b>{tariff['price']} ₽</b>\n\n"
+        f"Сумма со скидкой: <b>{tariff['price']} ₽</b>{old_p_str}\n\n"
         "Способы оплаты:\n"
         "• 💳 Банковская карта РФ / СБП (МИР, Visa, Mastercard)\n"
         "• ⭐️ Telegram Stars\n"
         "• 💎 Криптовалюта (USDT TRC20 / TON / CryptoBot)\n\n"
         "<i>(Платежный шлюз подключается при запуске сервиса)</i>"
     )
-    await update_view(call, text=text, reply_markup=keyboards.back_to_menu_kb(), photo_url=BANNER_MAIN)
+    await update_view(call, text=text, reply_markup=keyboards.back_to_menu_kb(), photo_url=BANNER_TARIFFS)
     await call.answer()
 
 # --- ЦЕНТР ЗАГРУЗОК ПО ---

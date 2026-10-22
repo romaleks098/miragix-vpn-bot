@@ -37,11 +37,13 @@ def main_menu_kb(has_active_sub: bool = False, trial_available: bool = True):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def tariffs_kb():
-    buttons = []
-    for key, data in TARIFFS.items():
-        text = f"{data['title']} — {data['price']} ₽"
-        buttons.append([InlineKeyboardButton(text=text, callback_data=f"buy_{key}")])
-    buttons.append([InlineKeyboardButton(text="◀️ Назад в меню", callback_data="back_main")])
+    buttons = [
+        [InlineKeyboardButton(text="🔥 1 Месяц — 99 ₽ (вместо 150 ₽)", callback_data="buy_month_1")],
+        [InlineKeyboardButton(text="⚡️ 3 Месяца — 249 ₽ (вместо 400 ₽)", callback_data="buy_month_3")],
+        [InlineKeyboardButton(text="💎 6 Месяцев — 449 ₽ (вместо 750 ₽)", callback_data="buy_month_6")],
+        [InlineKeyboardButton(text="👑 1 Год — 799 ₽ (вместо 1350 ₽)", callback_data="buy_year_1")],
+        [InlineKeyboardButton(text="◀️ Назад в меню", callback_data="back_main")]
+    ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 # Меню Центра Загрузок ПО

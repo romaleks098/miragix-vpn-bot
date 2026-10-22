@@ -14,12 +14,36 @@ MARZBAN_URL = os.getenv("MARZBAN_URL", "")
 MARZBAN_USERNAME = os.getenv("MARZBAN_USERNAME", "")
 MARZBAN_PASSWORD = os.getenv("MARZBAN_PASSWORD", "")
 
-# Тарифы (название, дни, цена в рублях)
+# Тарифы со сниженными ценами и скидками
 TARIFFS = {
-    "month_1": {"title": "1 Месяц", "days": 30, "price": 150},
-    "month_3": {"title": "3 Месяца", "days": 90, "price": 400},
-    "month_6": {"title": "6 Месяцев", "days": 180, "price": 750},
-    "year_1": {"title": "1 Год", "days": 365, "price": 1350},
+    "month_1": {
+        "title": "1 Месяц",
+        "days": 30,
+        "price": 99,
+        "old_price": 150,
+        "discount": "-34%"
+    },
+    "month_3": {
+        "title": "3 Месяца",
+        "days": 90,
+        "price": 249,
+        "old_price": 400,
+        "discount": "-38%"
+    },
+    "month_6": {
+        "title": "6 Месяцев",
+        "days": 180,
+        "price": 449,
+        "old_price": 750,
+        "discount": "-40%"
+    },
+    "year_1": {
+        "title": "1 Год",
+        "days": 365,
+        "price": 799,
+        "old_price": 1350,
+        "discount": "-41%"
+    },
 }
 
-SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "admin")
+SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "support")
