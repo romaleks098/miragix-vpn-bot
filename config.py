@@ -6,8 +6,11 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_IDS = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
 
-# Настройки триала (в днях)
-TRIAL_DAYS = int(os.getenv("TRIAL_DAYS", "3"))
+# Настройки триала: 1 день (24 часа) вместо 3 дней
+TRIAL_DAYS = int(os.getenv("TRIAL_DAYS", "1"))
+
+# Бонус за покупку реферала (в днях)
+REFERRAL_BONUS_DAYS = 3
 
 # Подключение к Marzban (если пусто, бот работает в тестовом демо-режиме)
 MARZBAN_URL = os.getenv("MARZBAN_URL", "")

@@ -55,7 +55,20 @@ async def cmd_give(message: Message):
         days=days
     )
     
+    rewarded, ref_id = await database.reward_referrer_on_purchase(target_id)
+    ref_info = ""
+    if rewarded and ref_id:
+        ref_info = f"\n🎁 Пригласившему пользователю <code>{ref_id}</code> начислено +{config.REFERRAL_BONUS_DAYS} дн. бонуса!"
+        try:
+            await message.bot.send_message(
+                ref_id,
+                f"🎉 <b>Бонус по реферальной программе!</b>\n\nПриглашенный вами друг оформил подписку! Вам автоматически начислено <b>+{config.REFERRAL_BONUS_DAYS} дня</b> подписки.",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
     await message.answer(
-        f"✅ Пользователю <code>{target_id}</code> успешно выдано <b>{days}</b> дней подписки (до {expire_dt.strftime('%d.%m.%Y %H:%M')}).",
+        f"✅ Пользователю <code>{target_id}</code> успешно выдано <b>{days}</b> дней подписки (до {expire_dt.strftime('%d.%m.%Y %H:%M')}).{ref_info}",
         parse_mode="HTML"
     )

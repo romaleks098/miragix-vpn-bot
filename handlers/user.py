@@ -12,9 +12,6 @@ import config
 
 router = Router()
 
-class PromoState(StatesGroup):
-    waiting_for_code = State()
-
 BANNER_MAIN = "https://raw.githubusercontent.com/romaleks098/miragix-vpn-bot/master/assets/banner_main.jpg"
 BANNER_INSTRUCTIONS = "https://raw.githubusercontent.com/romaleks098/miragix-vpn-bot/master/assets/banner_instructions.jpg"
 BANNER_TARIFFS = "https://raw.githubusercontent.com/romaleks098/miragix-vpn-bot/master/assets/banner_tariffs.jpg"
@@ -149,17 +146,6 @@ async def cmd_status(message: Message):
     )
     await message.answer_photo(photo=BANNER_MAIN, caption=text, reply_markup=keyboards.server_status_kb(), parse_mode="HTML")
 
-@router.message(Command("promo"))
-async def cmd_promo(message: Message, state: FSMContext):
-    await state.set_state(PromoState.waiting_for_code)
-    text = (
-        "🎟 <b>Активация промокода:</b>\n\n"
-        "Отправьте секретный промокод в ответном сообщении.\n\n"
-        "💡 <i>Подсказка: попробуйте приветственный промокод:</i>\n"
-        "<code>MIRAGIX2026</code>"
-    )
-    await message.answer(text, reply_markup=keyboards.back_to_menu_kb(), parse_mode="HTML")
-
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     text = (
@@ -217,7 +203,7 @@ async def cb_claim_trial(call: CallbackQuery):
     formatted_date = expire_dt.strftime("%d.%m.%Y %H:%M")
     
     msg_text = (
-        f"🎉 <b>Тестовый период на {config.TRIAL_DAYS} дня активирован!</b>\n\n"
+        "🎉 <b>Тестовый период на 24 часа активирован!</b>\n\n"
         f"📅 Активен до: <b>{formatted_date}</b>\n\n"
         f"🔑 <b>Ваша универсальная ссылка-подписка:</b>\n"
         f"<code>{sub_url}</code>\n\n"
@@ -355,15 +341,18 @@ async def cb_server_status(call: CallbackQuery):
 async def cb_referral_program(call: CallbackQuery):
     bot_info = await call.bot.get_me()
     ref_link = f"https://t.me/{bot_info.username}?start=ref_{call.from_user.id}"
-    refs_count = await database.get_referrals_count(call.from_user.id)
+    stats = await database.get_referrals_stats(call.from_user.id)
     
     text = (
         "👥 <b>Партнерская программа «Пригласи друга»:</b>\n\n"
-        "Поделитесь своей персональной ссылкой с друзьями, коллегами или в соцсетях.\n\n"
+        "Поделитесь ссылкой с друзьями или знакомыми.\n\n"
         "🎁 <b>Условия:</b>\n"
-        "• За каждого нового пользователя, перешедшего по вашей ссылке, вы получаете <b>+3 дня подписки БЕСПЛАТНО</b>.\n"
-        "• Друг получает стандартный бесплатный тест на 3 дня.\n\n"
-        f"📊 Вы уже пригласили: <b>{refs_count} чел.</b>\n\n"
+        "• Друг получает бесплатный тест на 24 часа.\n"
+        "• Как только приглашенный друг <b>оформит любую подписку</b> (даже на 1 месяц за 99 ₽) — вам автоматически начислится <b>+3 дня подписки БЕСПЛАТНО</b>!\n\n"
+        "📊 <b>Ваша статистика:</b>\n"
+        f"• Всего перешло по ссылке: <b>{stats['total']} чел.</b>\n"
+        f"• Оформили подписку: <b>{stats['paid']} чел.</b>\n"
+        f"• Получено бонусных дней: <b>+{stats['earned_days']} дн.</b>\n\n"
         "🔗 <b>Ваша пригласительная ссылка:</b>\n"
         f"<code>{ref_link}</code>\n\n"
         "<i>(Нажмите на ссылку, чтобы скопировать её)</i>"
@@ -429,36 +418,6 @@ async def cb_faq_devices(call: CallbackQuery):
     )
     await update_view(call, text=text, reply_markup=keyboards.faq_kb(), photo_url=BANNER_INSTRUCTIONS)
     await call.answer()
-
-# --- ВВОД ПРОМОКОДА ---
-
-@router.callback_query(F.data == "enter_promo")
-async def cb_enter_promo(call: CallbackQuery, state: FSMContext):
-    await state.set_state(PromoState.waiting_for_code)
-    text = (
-        "🎟 <b>Активация промокода:</b>\n\n"
-        "Отправьте секретный промокод в ответном сообщении.\n\n"
-        "💡 <i>Подсказка: попробуйте ввести приветственный промокод:</i>\n"
-        "<code>MIRAGIX2026</code>"
-    )
-    await update_view(call, text=text, reply_markup=keyboards.back_to_menu_kb(), photo_url=BANNER_MAIN)
-    await call.answer()
-
-@router.message(PromoState.waiting_for_code)
-async def process_promocode(message: Message, state: FSMContext):
-    code = message.text.strip()
-    success, msg = await database.activate_promocode(message.from_user.id, code)
-    await state.clear()
-    
-    user = await database.get_user(message.from_user.id)
-    has_sub = bool(user and user["is_active"] and user["expire_date"] and datetime.fromisoformat(user["expire_date"]) > datetime.now())
-    trial_available = not bool(user and user["trial_used"])
-    
-    await message.answer(
-        f"{msg}\n\nВозвращаемся в главное меню:",
-        reply_markup=keyboards.main_menu_kb(has_active_sub=has_sub, trial_available=trial_available),
-        parse_mode="HTML"
-    )
 
 # --- МЕНЮ ИНСТРУКЦИЙ ПО ПЛАТФОРМАМ ---
 

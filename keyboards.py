@@ -4,9 +4,9 @@ from config import TARIFFS, SUPPORT_USERNAME
 def main_menu_kb(has_active_sub: bool = False, trial_available: bool = True):
     buttons = []
     
-    # 1-й ряд: Подписка / Триал
+    # 1-й ряд: Подписка / Триал (на 24 часа)
     if not has_active_sub and trial_available:
-        buttons.append([InlineKeyboardButton(text="🎁 Активировать тест на 3 дня", callback_data="claim_trial")])
+        buttons.append([InlineKeyboardButton(text="🎁 Активировать тест на 24 часа", callback_data="claim_trial")])
     elif has_active_sub:
         buttons.append([InlineKeyboardButton(text="🔑 Моя подписка", callback_data="my_sub")])
         
@@ -28,9 +28,8 @@ def main_menu_kb(has_active_sub: bool = False, trial_available: bool = True):
         InlineKeyboardButton(text="❓ Вопросы (FAQ)", callback_data="faq_menu")
     ])
     
-    # 5-й ряд: Промокод и Поддержка
+    # 5-й ряд: Поддержка
     buttons.append([
-        InlineKeyboardButton(text="🎟 Ввести промокод", callback_data="enter_promo"),
         InlineKeyboardButton(text="💬 Поддержка", url=f"https://t.me/{SUPPORT_USERNAME}")
     ])
     

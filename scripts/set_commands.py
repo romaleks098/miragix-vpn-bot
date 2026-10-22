@@ -22,7 +22,6 @@ commands = [
     {"command": "tariffs", "description": "💳 Тарифы и акции"},
     {"command": "apps", "description": "📥 Скачать приложения"},
     {"command": "status", "description": "🌐 Мониторинг серверов"},
-    {"command": "promo", "description": "🎟 Ввести промокод"},
     {"command": "help", "description": "💬 Помощь и поддержка"}
 ]
 
